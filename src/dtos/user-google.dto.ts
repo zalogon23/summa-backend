@@ -1,4 +1,4 @@
-export interface UserDTO {
+export interface UserGoogleDTO {
     googleId: string;
     displayName: string;
     email: string;
