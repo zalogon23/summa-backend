@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import "isomorphic-fetch"
 import * as cookie from "cookie";
 
 @Injectable()
@@ -13,6 +14,7 @@ export class RefreshTokenService {
             domain: this.configService.get("FRONT_HOST"),
             path: '/',
         };
+        console.log("THE REFRESH TOKEN IS: " + refreshToken)
         const refreshTokenCookie = cookie.serialize('refreshToken', refreshToken, cookieOptions);
         return refreshTokenCookie
     }

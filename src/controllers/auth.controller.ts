@@ -30,13 +30,14 @@ export class AuthController {
         res.setHeader('Set-Cookie', refreshToken);
 
         const frontUrl = this.configService.get('FRONT_URL');
-        return res.redirect(`${frontUrl}${doesUserExists ? "" : "?new=true"}`);
+        return res.redirect(`${frontUrl}?${doesUserExists ? "" : "new=true&"}${"access_token=" + req.user.accessToken}`);
     }
 
     @Post('google/refresh-token')
     async refreshToken(@Req() req: Request, @Res() res: Response) {
 
         const refreshToken = req.cookies["refreshToken"];
+
 
         if (!refreshToken) {
             res.status(401).json({ error: "There is no refresh token." })
@@ -45,7 +46,7 @@ export class AuthController {
             const data = await this.refreshTokenService.getRefreshedToken(refreshToken)
 
             if (data.id_token) {
-                res.json({ token: data.id_token });
+                res.json({ token: data.access_token });
             } else {
                 res.status(400).json({ error: 'Refresh process failed in Google.' });
             }
