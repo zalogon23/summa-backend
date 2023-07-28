@@ -13,9 +13,8 @@ export class VideoController {
       if (!isValidYouTubeUrl(url)) return res.json({ ok: false, message: "Invalid Youtube URL" })
 
       const timeA = Date.now()
-      const info = await ytdl.getInfo(url);
-
-      const audioFormat = ytdl.chooseFormat(info.formats, { filter: 'audioonly' });
+      const { audioFormat, thumbnails } = await getAudioFormat(url)
+      if (audioFormat == null) return res.json({ ok: false, message: "Problem getting video from Youtube." })
 
       const videoDurationLimit = 40
       const isDurationRight = isAudioDurationUnder(audioFormat, videoDurationLimit)
@@ -28,21 +27,21 @@ export class VideoController {
         quality: 'highestaudio',
       });
 
-      let timeB
-      const transcription = await getAudioTranscription(audioStream, timeA, timeB)
-      console.log("transcription: " + (Date.now() - timeB) / 1000)
+      const { transcription, language } = await getAudioTranscription(audioStream, timeA)
+      if (language != "en" && language != "es") return res.json({ ok: false, message: "We only know english and spanish 😢" })
 
       if (!transcription) {
         console.log("The transcription is empty")
-        return res.json({ ok: false, message: "Sorry, we had a problem in the server" })
+        return res.json({ ok: false, message: "Please try another video, we can't transcript this." })
       }
       console.log("Got the transcription")
+
       const summary = await getSummary(transcription)
       console.log("total: " + (Date.now() - timeD) / 1000)
       return res.json({
         ok: true,
         result: summary,
-        image: getHighQualityThumbnail(info)
+        image: getHighQualityThumbnail(thumbnails)
       });
     } catch (err) {
       console.error('Error:', err);
@@ -69,29 +68,37 @@ export class VideoController {
 }
 
 
-async function getAudioTranscription(audioStream: Stream, timeA: number, timeB: number): Promise<string> {
+async function getAudioTranscription(audioStream: Stream, timeA: number): Promise<any> {
   const chunks: Buffer[] = [];
+  const timeB = Date.now()
   return new Promise((res, rej) => {
     audioStream.on('data', (chunk) => chunks.push(chunk));
     audioStream.on('end', async () => {
-      console.log("audio stream: " + (Date.now() - timeA) / 1000)
+      console.log("Audio got downloaded and buffered locally: " + (Date.now() - timeA) / 1000)
       const audioData = Buffer.concat(chunks);
 
       // Send the audio data to Deepgram API for transcription
       const API_KEY = '75b9625206cc2af43721900cd61e68250e8ac2ea';
-      timeB = Date.now()
+
       const response = await transcribeAudio(API_KEY, audioData);
-      res(response?.results?.channels[0]?.alternatives[0]?.transcript)
+      console.log("Received transcription from Deepgram in: " + (Date.now() - timeB) / 1000)
+
+      const channel = response?.results?.channels[0]
+      const transcription = channel?.alternatives[0]?.transcript
+      const language = channel.detected_language
+      console.log("Language (Deepgram): " + language)
+      console.log(transcription)
+      res({ transcription, language })
     });
     audioStream.on("error", (err) => rej(err))
   })
 }
 
 async function transcribeAudio(apiKey: string, audioData: Buffer) {
-  const apiUrl = 'https://api.deepgram.com/v1/listen';
+  const apiUrl = 'https://api.deepgram.com/v1/listen?detect_language=true&tier=nova';
   const headers = {
     'Authorization': `Token ${apiKey}`,
-    'Content-Type': "audio/mpeg", // Change this to the correct MIME type for your audio data
+    'Content-Type': "audio/mpeg",
   };
 
   const response = await fetch(apiUrl, {
@@ -103,6 +110,20 @@ async function transcribeAudio(apiKey: string, audioData: Buffer) {
   const result = await response.json() as any;
   return result;
 }
+
+async function getAudioFormat(url: string) {
+  try {
+
+    const info = await ytdl.getInfo(url);
+    const thumbnails = info.videoDetails.thumbnails
+    const audioFormat = ytdl.chooseFormat(info.formats, { filter: 'audioonly' });
+    return ({ audioFormat, thumbnails })
+  } catch (err) {
+    console.log(err)
+    return null
+  }
+}
+
 async function getSummary(transcription: string) {
 
   const sections = splitTextIntoSections(transcription, 6000)
@@ -124,7 +145,7 @@ async function getSummary(transcription: string) {
         messages: [
           {
             role: "system",
-            content: "You are a web page generator. your resources are: summaries, list items, pieces of advice, interleave them. keep it intriguing. it is forbidden to mention the video/script/keypoint. Put this content in an HTML <body></body> use tags h3, p, ul, li and strong. remember HTML. dont repeat yourself"
+            content: "You are a web page generator. your resources are: summaries, list items, pieces of advice, interleave them, use different titles per section. keep it intriguing. never say things like 'in this video'. Put this content in an HTML <body></body> use tags h3, p, ul, li and strong. remember HTML. dont repeat yourself"
           },
           {
             role: "user",
@@ -135,7 +156,6 @@ async function getSummary(transcription: string) {
     })
 
     const result = await response.json() as any;
-    console.log(JSON.stringify(result))
     const text = result?.choices[0]?.message?.content || "";
     return text
   })
@@ -168,8 +188,8 @@ function splitTextIntoSections(text, maxLength) {
   if (currentSection.trim() !== '') {
     sections.push(currentSection);
   }
-
-  return sections;
+  console.log(sections.filter(s => !!s))
+  return sections.filter(s => !!s);
 }
 
 function isAudioDurationUnder(audioFormat, minutes) {
@@ -177,8 +197,7 @@ function isAudioDurationUnder(audioFormat, minutes) {
   return audioDurationInMinutes < minutes;
 }
 
-function getHighQualityThumbnail(info: any) {
-  const thumbnails = info.videoDetails.thumbnails;
+function getHighQualityThumbnail(thumbnails: any) {
   const highQualityThumbnail = thumbnails.reduce((prev, curr) => {
     if (!prev || curr.width * curr.height > prev.width * prev.height) {
       return curr;
