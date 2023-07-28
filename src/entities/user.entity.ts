@@ -18,4 +18,10 @@ export class User {
         default: '',
     })
     description: string;
+
+    @Column({
+        nullable: false,
+        default: 0,
+    })
+    coins: number;
 }

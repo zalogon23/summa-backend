@@ -8,7 +8,8 @@ export class MapperService {
         return {
             id: user.googleId,
             username: user.displayName,
-            description: ""
+            description: "",
+            coins: 0
         }
     }
 }

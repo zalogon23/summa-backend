@@ -11,16 +11,9 @@ export class UserController {
 
     @Get("")
     async getMe(@Headers('Authorization') header: string, @Res() res: Response) {
-        console.log(header)
         if (!header) return res.sendStatus(401)
 
-        const apiKey = this.configService.get("API_KEY")
-        const response = await fetch(`https://people.googleapis.com/v1/people/me?personFields=names,photos&key=${apiKey}`, {
-            headers: {
-                "Authorization": header,
-            },
-        })
-        const data = await response.json()
+        const data = await this.userService.getUser(header)
         console.log("data: " + JSON.stringify(data))
         if (data?.error && data.error?.code) {
             return res.sendStatus(401)

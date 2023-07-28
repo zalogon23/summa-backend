@@ -23,6 +23,7 @@ export class AuthController {
         const doesUserExists = !!(await this.userService.findUserById(req.user.googleId))
         if (!doesUserExists) {
             const user = this.mapperService.mapToUser(req.user)
+            user.coins = +this.configService.get('DEFAULT_COINS')
             this.userService.createUser(user)
         }
 
