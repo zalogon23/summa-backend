@@ -17,7 +17,6 @@ export class UserService {
                 .into(User)
                 .values(createUserDto)
                 .execute()
-            console.log(result)
         } catch (err) {
             console.log(err)
         }
@@ -35,7 +34,11 @@ export class UserService {
     async hasEnoughCoins(coins: number, id: string): Promise<boolean> {
         try {
             const user = await this.userRepository.findOneBy({ id })
-            if (!user || user.coins < coins) return false
+            const hasEnoughCoins = user && (user.coins > coins)
+            console.log(`UserService.hasEnoughCoins: ${hasEnoughCoins}`)
+            if (!hasEnoughCoins) {
+                return false
+            }
             return true
         } catch (err) {
             console.log(err)
@@ -45,10 +48,18 @@ export class UserService {
 
     async spend(coins: number, id: string): Promise<boolean> {
         try {
+            const hasEnoughCoins = await this.hasEnoughCoins(coins, id)
+            if (!hasEnoughCoins) {
+                return false
+            }
             const user = await this.userRepository.findOneBy({ id })
-            if (!this.hasEnoughCoins(coins, id)) return false
+            console.log("current coins: " + user.coins)
+            console.log("spending coins: " + coins)
             user.coins -= coins
+            console.log("after spending coins: " + user.coins)
+            console.log(JSON.stringify(user))
             await this.userRepository.save(user);
+            return true
         } catch (err) {
             console.log(err)
             return false
@@ -57,7 +68,6 @@ export class UserService {
 
     async getUser(header: string) {
         try {
-            console.log("Received Authorization Header: " + header)
 
             const apiKey = this.configService.get("API_KEY")
             const response = await fetch(`https://people.googleapis.com/v1/people/me?personFields=names,photos&key=${apiKey}`, {

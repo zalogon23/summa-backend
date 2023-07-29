@@ -44,7 +44,7 @@
     "rxjs": "^7.8.1",
     "typeorm": "^0.3.17",
     "whisper-nodejs": "^1.0.0",
-    "ytdl-core": "^4.11.5"
+    "ytdl-core": "git+ssh://git@github.com:khlevon/node-ytdl-core.git#v4.11.4-patch.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",

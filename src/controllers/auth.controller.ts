@@ -24,7 +24,7 @@ export class AuthController {
         if (!doesUserExists) {
             const user = this.mapperService.mapToUser(req.user)
             user.coins = +this.configService.get('DEFAULT_COINS')
-            this.userService.createUser(user)
+            await this.userService.createUser(user)
         }
 
         const refreshToken = this.refreshTokenService.createRefreshCookie(req.user.refreshToken)
@@ -41,7 +41,7 @@ export class AuthController {
 
 
         if (!refreshToken) {
-            res.status(401).json({ ok: false, message: "There is no refresh token." })
+            res.status(403).json({ ok: false, message: "There is no refresh token." })
         }
         try {
             const data = await this.refreshTokenService.getRefreshedToken(refreshToken)

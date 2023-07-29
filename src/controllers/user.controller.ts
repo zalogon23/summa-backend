@@ -14,7 +14,6 @@ export class UserController {
         if (!header) return res.sendStatus(401)
 
         const data = await this.userService.getUser(header)
-        console.log("data: " + JSON.stringify(data))
         if (data?.error && data.error?.code) {
             return res.sendStatus(401)
         }

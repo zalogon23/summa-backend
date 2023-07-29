@@ -14,7 +14,6 @@ export class RefreshTokenService {
             domain: this.configService.get("FRONT_HOST"),
             path: '/',
         };
-        console.log("THE REFRESH TOKEN IS: " + refreshToken)
         const refreshTokenCookie = cookie.serialize('refreshToken', refreshToken, cookieOptions);
         return refreshTokenCookie
     }

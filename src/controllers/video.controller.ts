@@ -24,7 +24,6 @@ export class VideoController {
   @Get("duration/:url")
   async getVideoDuration(@Param('url') url: string, @Res() res: Response) {
     try {
-      console.log("eeeeeeeeeeeeeeeeeeee")
       const response = await this.videoService.getVideoDuration(url)
       return res.json(response)
     } catch (err) {

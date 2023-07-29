@@ -21,50 +21,56 @@ export class VideoService {
         console.log(mimeType)
 
         const coins = Math.floor(this.getDuration(audioFormat))
-        if (!this.userService.hasEnoughCoins(coins, id)) return ({ ok: false, message: "You haven't enoughh coins for this video. 😢 (" + coins + " coins)" })
+        const hasEnoughCoinsPreBuffer = await this.userService.hasEnoughCoins(coins, id)
+
+        console.log(`Has enough coins in VideoService.getAudioSummary: ${hasEnoughCoinsPreBuffer}`)
+        if (!hasEnoughCoinsPreBuffer) return ({ ok: false, message: "You haven't enough coins for this video. 😢 (" + coins + " coins)" })
 
         const videoDurationLimit = this.configService.get("DURATION_LIMIT")
         const isDurationRight = this.isAudioDurationUnder(audioFormat, videoDurationLimit)
 
         if (!isDurationRight) return ({ ok: false, message: "Video duration longer than " + videoDurationLimit + " minutes" })
 
-        const audioStream = ytdl(url, {
+        const audioStream = await ytdl(url, {
             format: audioFormat,
             filter: 'audioonly',
             quality: 'highestaudio',
         });
 
+        const hasEnoughCoinsPreTranscript = await this.userService.hasEnoughCoins(coins, id)
+        console.log(`Has enough coins in VideoService.getAudioSummary: ${hasEnoughCoinsPreTranscript}`)
+        if (!hasEnoughCoinsPreTranscript) return ({ ok: false, message: "You haven't enough coins for this video. 😢 (" + coins + " coins)" })
+
         const { transcription, language } = await this.getAudioTranscription(audioStream, timeA, mimeType)
 
         //After getting the transcription you pay.
-        const paid = this.userService.spend(coins, id)
-        if (!paid) return ({ ok: false, message: "An apprentice dropped your coins on the way, we're refunding them." })
+        const paid = await this.userService.spend(coins, id)
+        if (!paid) return ({ ok: false, message: "There was a problem while receiving your coins." })
 
-        if (language != "en" && language != "es") return ({ ok: false, message: "We only know english and spanish 😢" })
+        if (language != "en" && language != "es") return ({ ok: false, message: "We only know english and spanish 😢", paid: coins })
 
         if (!transcription) {
             console.log("The transcription is empty")
-            return ({ ok: false, message: "Please try another video, we can't transcript this." })
+            return ({ ok: false, message: "Please try another video, we can't transcript this.", paid: coins })
         }
         console.log("Got the transcription")
 
         const summary = await this.getSummary(transcription)
-        console.log("total: " + (Date.now() - timeD) / 1000)
+        console.log("Total: " + (Date.now() - timeD) / 1000)
         return ({
             ok: true,
             result: summary,
-            image: this.getHighQualityThumbnail(thumbnails)
+            image: this.getHighQualityThumbnail(thumbnails),
+            paid: coins
         });
     }
 
     async getVideoDuration(url: string) {
         if (!this.isValidYouTubeUrl(url)) return ({ ok: false, message: "Invalid Youtube URL" })
-        console.log(" const info = await ytdl.getInfo(url);")
         const info = await ytdl.getInfo(url);
-        console.log(" const audioFormat = ytdl.chooseFormat(info.formats, { ")
+        const audioFormat = await ytdl.chooseFormat(info.formats, { filter: 'audioonly' });
+        console.log(audioFormat)
 
-        const audioFormat = ytdl.chooseFormat(info.formats, { filter: 'audioonly' });
-        console.log("return")
         return ({ ok: true, duration: +audioFormat.approxDurationMs / 1000 / 60 })
     }
 
@@ -87,7 +93,6 @@ export class VideoService {
                 const transcription = channel?.alternatives[0]?.transcript
                 const language = channel.detected_language
                 console.log("Language (Deepgram): " + language)
-                console.log(transcription)
                 res({ transcription, language })
             });
             audioStream.on("error", (err) => rej(err))
@@ -188,7 +193,6 @@ export class VideoService {
         if (currentSection.trim() !== '') {
             sections.push(currentSection);
         }
-        console.log(sections.filter(s => !!s))
         return sections.filter(s => !!s);
     }
 
