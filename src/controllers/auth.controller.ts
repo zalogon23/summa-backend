@@ -41,18 +41,18 @@ export class AuthController {
 
 
         if (!refreshToken) {
-            res.status(403).json({ ok: false, message: "There is no refresh token." })
+            return res.status(403).json({ ok: false, message: "There is no refresh token." })
         }
         try {
             const data = await this.refreshTokenService.getRefreshedToken(refreshToken)
 
             if (data.id_token) {
-                res.json({ ok: true, token: data.access_token });
+                return res.json({ ok: true, token: data.access_token });
             } else {
-                res.status(400).json({ ok: false, message: 'Refresh process failed in Google.' });
+                return res.status(400).json({ ok: false, message: 'Refresh process failed in Google.' });
             }
         } catch (message) {
-            res.status(500).json({ ok: false, message });
+            return res.status(500).json({ ok: false, message });
         }
     }
 }

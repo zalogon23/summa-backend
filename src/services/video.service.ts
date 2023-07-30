@@ -23,7 +23,7 @@ export class VideoService {
         const coins = Math.floor(this.getDuration(audioFormat))
         const hasEnoughCoinsPreBuffer = await this.userService.hasEnoughCoins(coins, id)
 
-        console.log(`Has enough coins in VideoService.getAudioSummary: ${hasEnoughCoinsPreBuffer}`)
+        console.log(`Has enough coins in VideoService.getAudioSummary PreBuffer: ${hasEnoughCoinsPreBuffer}`)
         if (!hasEnoughCoinsPreBuffer) return ({ ok: false, message: "You haven't enough coins for this video. 😢 (" + coins + " coins)" })
 
         const videoDurationLimit = this.configService.get("DURATION_LIMIT")
@@ -38,14 +38,10 @@ export class VideoService {
         });
 
         const hasEnoughCoinsPreTranscript = await this.userService.hasEnoughCoins(coins, id)
-        console.log(`Has enough coins in VideoService.getAudioSummary: ${hasEnoughCoinsPreTranscript}`)
+        console.log(`Has enough coins in VideoService.getAudioSummary Pre Transcipt: ${hasEnoughCoinsPreTranscript}`)
         if (!hasEnoughCoinsPreTranscript) return ({ ok: false, message: "You haven't enough coins for this video. 😢 (" + coins + " coins)" })
 
         const { transcription, language } = await this.getAudioTranscription(audioStream, timeA, mimeType)
-
-        //After getting the transcription you pay.
-        const paid = await this.userService.spend(coins, id)
-        if (!paid) return ({ ok: false, message: "There was a problem while receiving your coins." })
 
         if (language != "en" && language != "es") return ({ ok: false, message: "We only know english and spanish 😢", paid: coins })
 
@@ -56,6 +52,11 @@ export class VideoService {
         console.log("Got the transcription")
 
         const summary = await this.getSummary(transcription)
+
+        //After getting the summary you pay.
+        const paid = await this.userService.spend(coins, id)
+        if (!paid) return ({ ok: false, message: "There was a problem while receiving your coins." })
+
         console.log("Total: " + (Date.now() - timeD) / 1000)
         return ({
             ok: true,
@@ -100,7 +101,7 @@ export class VideoService {
     }
 
     async transcribeAudio(apiKey: string, audioData: Buffer, mimeType: string) {
-        const apiUrl = 'https://api.deepgram.com/v1/listen?detect_language=true&tier=nova';
+        const apiUrl = 'https://api.deepgram.com/v1/listen?detect_language=true&tier=nova&punctuate=true';
         const headers = {
             'Authorization': `Token ${apiKey}`,
             'Content-Type': mimeType,
@@ -131,12 +132,14 @@ export class VideoService {
 
     async getSummary(transcription: string) {
 
-        const sections = this.splitTextIntoSections(transcription, 6000)
+        const sections = this.splitTextIntoSections(transcription, 20000)
         console.log("There are " + sections.length + " sections")
+        console.log(`Transcription length: ${transcription.length}`)
 
         const API_KEY = "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"
 
-        const promises = sections.map(async (section) => {
+        const promises = sections.map(async (section, id) => {
+
             const response = await fetch("https://api.openai.com/v1/chat/completions", {
                 method: "POST",
                 headers: {
@@ -146,21 +149,22 @@ export class VideoService {
                 body: JSON.stringify({
                     model: "gpt-3.5-turbo-16k",
                     temperature: 0.1,
-                    max_tokens: 1800,
+                    max_tokens: 1500,
                     messages: [
                         {
                             role: "system",
-                            content: "You are a web page generator. your resources are: summaries, list items, pieces of advice, interleave them, use different titles per section. keep it intriguing. never say things like 'in this video'. Put this content in an HTML <body></body> use tags h3, p, ul, li and strong. remember HTML. dont repeat yourself"
+                            content: "You are a web page generator. your resources are: summaries, list items, pieces of advice, interleave them, use different titles per section. narrate the content as you understand it (dont give your moral opinion). never say things like 'in this video'. Put this content in an HTML <body></body> use tags h3, p, ul, li and strong. remember HTML. dont repeat yourself"
                         },
                         {
                             role: "user",
-                            content: "This is the script: " + transcription
+                            content: "This is the script: " + section
                         }
                     ]
                 })
             })
 
             const result = await response.json() as any;
+            console.log(`Result of segment ${id + 1}: ${JSON.stringify(result)}`)
             const text = result?.choices[0]?.message?.content || "";
             return text
         })

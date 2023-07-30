@@ -8,11 +8,13 @@ export class RefreshTokenService {
     constructor(private readonly configService: ConfigService) { }
 
     createRefreshCookie(refreshToken: string) {
-        const cookieOptions = {
+        const cookieOptions: cookie.CookieSerializeOptions = {
             httpOnly: true,
             expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-            domain: this.configService.get("FRONT_HOST"),
+            domain: this.configService.get("FRONT_DOMAIN"),
             path: '/',
+            secure: true,
+            sameSite: "none"
         };
         const refreshTokenCookie = cookie.serialize('refreshToken', refreshToken, cookieOptions);
         return refreshTokenCookie

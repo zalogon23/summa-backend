@@ -34,6 +34,10 @@ export class UserService {
     async hasEnoughCoins(coins: number, id: string): Promise<boolean> {
         try {
             const user = await this.userRepository.findOneBy({ id })
+            console.log(`User: ${JSON.stringify(user)}`)
+            console.log(`User coins: ${user.coins}`)
+            console.log(`Necessary coins: ${coins}`)
+            console.log(`Has enough funds? ${user && (user.coins > coins)}`)
             const hasEnoughCoins = user && (user.coins > coins)
             console.log(`UserService.hasEnoughCoins: ${hasEnoughCoins}`)
             if (!hasEnoughCoins) {
